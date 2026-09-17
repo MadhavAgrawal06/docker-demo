@@ -1,0 +1,49 @@
+
+name: Spring Boot Docker CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Build Spring Boot application
+        run: |
+          chmod +x mvnw
+          ./mvnw clean package -DskipTests
+
+      - name: Build Docker image
+        run: docker build -t docker-demo:ci .
+
+      - name: Run Docker container
+        run: |
+          docker run -d --name docker-demo-container -p 8080:8080 docker-demo:ci
+
+          for i in {1..30}; do
+            if curl --fail http://localhost:8080/; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs docker-demo-container
+          exit 1
+
+      - name: Stop Docker container
+        if: always()
+        run: docker rm -f docker-demo-container || true
